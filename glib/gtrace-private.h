@@ -67,4 +67,15 @@ void (g_trace_mark) (gint64       begin_time_nsec,
 #endif
 #endif
 
+guint   (g_trace_define_int_counter) (const char *group,
+                                      const char *name,
+                                      const char *description);
+void    (g_trace_set_int_counter)    (guint       id,
+                                      gint64      value);
+
+#ifndef HAVE_SYSPROF
+#define g_trace_define_int_counter(g, n, d) 0
+#define g_trace_set_int_counter(i,v) 0
+#endif
+
 G_END_DECLS

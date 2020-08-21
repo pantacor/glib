@@ -96,3 +96,68 @@ void
   va_end (args);
 #endif  /* HAVE_SYSPROF */
 }
+
+/*
+ * g_trace_define_int_counter:
+ * @group: name of the group for categorising this counter
+ * @name: name of the counter
+ * @description: description for the counter
+ *
+ * Defines a new counter with integer values.
+ *
+ * The name should be unique within all counters defined with
+ * the same @group. The description will be shown in the sysprof UI.
+ *
+ * To add entries for this counter to a trace, use
+ * g_trace_set_int_counter().
+ *
+ * Returns: ID of the counter, for use with g_trace_set_int_counter()
+ *
+ * Since: 2.68
+ */
+guint
+(g_trace_define_int_counter) (const char *group,
+                              const char *name,
+                              const char *description)
+{
+#ifdef HAVE_SYSPROF
+  SysprofCaptureCounter counter;
+
+  counter.id = sysprof_collector_request_counters (1);
+  counter.type = SYSPROF_CAPTURE_COUNTER_INT64;
+  counter.value.v64 = 0;
+  g_strlcpy (counter.category, group, sizeof counter.category);
+  g_strlcpy (counter.name, name, sizeof counter.name);
+  g_strlcpy (counter.description, description, sizeof counter.description);
+
+  sysprof_collector_define_counters (&counter, 1);
+
+  return counter.id;
+#else
+  return 0;
+#endif
+}
+
+/*
+ * g_trace_set_int_counter:
+ * @id: ID of the counter
+ * @val: the value to set the counter to
+ *
+ * Adds a counter value to a trace.
+ *
+ * The ID must be obtained via g_trace_define_int_counter()
+ * before using this function.
+ *
+ * Since: 2.68
+ */
+void
+(g_trace_set_int_counter) (guint  id,
+                           gint64 val)
+{
+#ifdef HAVE_SYSPROF
+  SysprofCaptureCounterValue value;
+
+  value.v64 = val;
+  sysprof_collector_set_counters (&id, &value, 1);
+#endif
+}
