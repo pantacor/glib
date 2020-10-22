@@ -89,8 +89,8 @@ test_interface_prerequisite (void)
 
   g_free (prereqs);
 
-  g_assert (g_type_interface_instantiable_prerequisite (baa_get_type ()) == G_TYPE_INVALID);
-  g_assert (g_type_interface_instantiable_prerequisite (boo_get_type ()) == G_TYPE_INVALID);
+  g_assert_cmpint (g_type_interface_instantiable_prerequisite (baa_get_type ()), ==, G_TYPE_INVALID);
+  g_assert_cmpint (g_type_interface_instantiable_prerequisite (boo_get_type ()), ==, G_TYPE_INVALID);
 }
 
 typedef struct {

@@ -1698,9 +1698,9 @@ g_type_interface_prerequisites (GType  interface_type,
  * If the interface type has no instantiable prerequisite,
  * G_TYPE_INVALID is returned.
  *
- * Since: 2.66
+ * Since: 2.68
  *
- * Returns: the instantiable prerequisite type or G_TYPE_INVALID if none
+ * Returns: the instantiable prerequisite type or %G_TYPE_INVALID if none
  **/
 GType
 g_type_interface_instantiable_prerequisite (GType interface_type)
