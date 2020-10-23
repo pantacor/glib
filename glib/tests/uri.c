@@ -1711,20 +1711,40 @@ test_uri_join_split_round_trip (void)
 static const struct
 {
   /* Inputs */
+  const gchar *base;
   const gchar *uri;
   GUriFlags flags;
   /* Outputs */
   const gchar *path;
+  int port;
 } normalize_tests[] =
   {
-    { "http://foo/path with spaces", G_URI_FLAGS_ENCODED,
-      "/path%20with%20spaces" },
-    { "http://foo/path with spaces 2", G_URI_FLAGS_ENCODED_PATH,
-      "/path%20with%20spaces%202" },
-    { "http://foo/%aa", G_URI_FLAGS_ENCODED,
-      "/%AA" },
-    { "http://foo/p\xc3\xa4th/", G_URI_FLAGS_ENCODED | G_URI_FLAGS_PARSE_RELAXED,
-      "/p%C3%A4th/" },
+    { NULL, "http://foo/path with spaces", G_URI_FLAGS_ENCODED,
+      "/path%20with%20spaces", -1 },
+    { NULL, "http://foo/path with spaces 2", G_URI_FLAGS_ENCODED_PATH,
+      "/path%20with%20spaces%202", -1 },
+    { NULL, "http://foo/%aa", G_URI_FLAGS_ENCODED,
+      "/%AA", -1 },
+    { NULL, "http://foo/p\xc3\xa4th/", G_URI_FLAGS_ENCODED | G_URI_FLAGS_PARSE_RELAXED,
+      "/p%C3%A4th/", -1 },
+    { NULL, "http://foo", G_URI_FLAGS_SCHEME_NORMALIZE,
+      "/", -1 },
+    { NULL, "nothttp://foo", G_URI_FLAGS_SCHEME_NORMALIZE,
+      "", -1 },
+    { NULL, "http://foo:80", G_URI_FLAGS_SCHEME_NORMALIZE,
+      "/", -1 },
+    { NULL, "ftp://foo:21", G_URI_FLAGS_SCHEME_NORMALIZE,
+      "", -1 },
+    { NULL, "nothttp://foo:80", G_URI_FLAGS_SCHEME_NORMALIZE,
+      "", 80 },
+    { "http://foo", "//bar", G_URI_FLAGS_SCHEME_NORMALIZE,
+      "/", -1 },
+    { "http://foo", "//bar:80", G_URI_FLAGS_SCHEME_NORMALIZE,
+      "/", -1 },
+    { "nothttp://foo", "//bar:80", G_URI_FLAGS_SCHEME_NORMALIZE,
+      "", 80 },
+    { "http://foo", "//bar", 0,
+      "", -1 },
   };
 
 static void
@@ -1732,11 +1752,18 @@ test_uri_normalize (void)
 {
   for (gsize i = 0; i < G_N_ELEMENTS (normalize_tests); ++i)
     {
-      GUri *uri = g_uri_parse (normalize_tests[i].uri,
-                               normalize_tests[i].flags,
-                               NULL);
+      GUri *uri, *base = NULL;
+      if (normalize_tests[i].base)
+        base = g_uri_parse (normalize_tests[i].base, normalize_tests[i].flags, NULL);
+
+      uri = g_uri_parse_relative (base,
+                                  normalize_tests[i].uri,
+                                  normalize_tests[i].flags,
+                                  NULL);
+
       g_assert_nonnull (uri);
       g_assert_cmpstr (g_uri_get_path (uri), ==, normalize_tests[i].path);
+      g_assert_cmpint (g_uri_get_port (uri), ==, normalize_tests[i].port);
     }
 }
 

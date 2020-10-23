@@ -749,6 +749,50 @@ uri_cleanup (const gchar *uri_string)
 }
 
 static gboolean
+scheme_is_http_like (const char *scheme)
+{
+  const char * const schemes[] = { "https", "http", "wss", "ws" };
+  for (int i = 0; i < G_N_ELEMENTS (schemes); ++i)
+    {
+      if (!strcmp (schemes[i], scheme))
+        return TRUE;
+    }
+  return FALSE;
+}
+
+static int
+normalize_port (const char *scheme,
+                int         port)
+{
+  char *default_schemes[3] = { NULL };
+
+  switch (port)
+    {
+    case 21:
+      default_schemes[0] = "ftp";
+      break;
+    case 80:
+      default_schemes[0] = "http";
+      default_schemes[1] = "ws";
+      break;
+    case 443:
+      default_schemes[0] = "https";
+      default_schemes[1] = "wss";
+      break;
+    default:
+      break;
+    }
+
+  for (gsize i = 0; default_schemes[i]; ++i)
+    {
+      if (!strcmp (scheme, default_schemes[i]))
+        return -1;
+    }
+
+  return port;
+}
+
+static gboolean
 g_uri_split_internal (const gchar  *uri_string,
                       GUriFlags     flags,
                       gchar       **scheme,
@@ -766,6 +810,7 @@ g_uri_split_internal (const gchar  *uri_string,
   const gchar *end, *colon, *at, *path_start, *semi, *question;
   const gchar *p, *bracket, *hostend;
   gchar *cleaned_uri_string = NULL;
+  gchar *normalized_scheme = NULL;
 
   if (scheme)
     *scheme = NULL;
@@ -803,8 +848,9 @@ g_uri_split_internal (const gchar  *uri_string,
 
   if (p > uri_string && *p == ':')
     {
+      normalized_scheme = g_ascii_strdown (uri_string, p - uri_string);
       if (scheme)
-        *scheme = g_ascii_strdown (uri_string, p - uri_string);
+        *scheme = g_steal_pointer (&normalized_scheme);
       p++;
     }
   else
@@ -930,6 +976,22 @@ g_uri_split_internal (const gchar  *uri_string,
                       G_URI_ERROR_BAD_PATH, error))
     goto fail;
 
+  /* Scheme-based normalization */
+  if (flags & G_URI_FLAGS_SCHEME_NORMALIZE && ((scheme && *scheme) || normalized_scheme))
+    {
+      const char *scheme_str = scheme && *scheme ? *scheme : normalized_scheme;
+
+      if (scheme_is_http_like (scheme_str) && path && !**path)
+        {
+          g_free (*path);
+          *path = g_strdup ("/");
+        }
+
+      if (port && *port != -1)
+        *port = normalize_port (scheme_str, *port);
+    }
+
+  g_free (normalized_scheme);
   g_free (cleaned_uri_string);
   return TRUE;
 
@@ -949,6 +1011,7 @@ g_uri_split_internal (const gchar  *uri_string,
   if (fragment)
     g_clear_pointer (fragment, g_free);
 
+  g_free (normalized_scheme);
   g_free (cleaned_uri_string);
   return FALSE;
 }
@@ -1344,7 +1407,6 @@ g_uri_parse_relative (GUri         *base_uri,
       g_uri_unref (uri);
       return NULL;
     }
-
   if (base_uri)
     {
       /* This is section 5.2.2 of RFC 3986, except that we're doing
@@ -1401,6 +1463,19 @@ g_uri_parse_relative (GUri         *base_uri,
               uri->host = g_strdup (base_uri->host);
               uri->port = base_uri->port;
             }
+        }
+
+      /* Scheme normalization couldn't have been done earlier
+          as the relative URI didn't have a scheme */
+      if (flags & G_URI_FLAGS_SCHEME_NORMALIZE)
+        {
+          if (scheme_is_http_like (uri->scheme) && !*uri->path)
+            {
+              g_free (uri->path);
+              uri->path = g_strdup ("/");
+            }
+
+          uri->port = normalize_port (uri->scheme, uri->port);
         }
     }
 
